@@ -130,6 +130,14 @@ the container keep running across track changes, and the Icecast session
 stays open.  Gaps (while Mopidy fetches the next track) are filled with
 silence, so the stream is continuous in wall clock time as well.
 
+The publisher is the clock: it hands the samples to the encoder in real
+time and fills the gaps with silence.  It has to pause between the chunks,
+because the encoder writes the data to Icecast from its own thread and that
+thread needs the GIL - which the main thread holds while it is in there.
+Without the pause, the main thread spins at 100% CPU, starves the encoder
+and the stream falls behind (this bites on PyGObject 3.42, the version
+Debian 12 ships).
+
 The publisher also publishes the track title to Icecast.  It gets the title
 from Mopidy's JSON-RPC API, because Qobuz serves tagless FLAC and the Mopidy
 core's tag events do not reach the audio sink (see the patch in
