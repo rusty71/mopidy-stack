@@ -1,0 +1,80 @@
+# Mopidy configuration for the local stack.
+#
+# Copy this file to config/mopidy.conf and fill in the Qobuz credentials.
+# The real file is not in the repository: it holds the credentials.
+#
+# See https://docs.mopidy.com/ for the reference of every option.
+
+[core]
+cache_dir = /home/opencode/mopidy-stack/data/cache
+config_dir = /home/opencode/.config/mopidy
+data_dir = /home/opencode/mopidy-stack/data
+max_tracklist_length = 10000
+restore_state = true
+
+[logging]
+verbosity = 2
+format = %(levelname)-8s:  %(message)s
+color = true
+
+[audio]
+# Software mixing so that the volume changes work on the Icecast streams.
+mixer = software
+mixer_volume = 100
+# The audio is handed to bin/icecast-publisher.py, which encodes it and keeps
+# a permanent connection to Icecast open.  See the README for why.
+#
+# Only one branch: the publisher produces both the lossless and the MP3
+# stream from this single PCM feed.
+#
+# The password must match <source-password> in config/icecast.xml.
+output = queue ! audioresample ! audioconvert ! audio/x-raw,rate=96000,channels=2,format=S32LE ! tcpclientsink host=127.0.0.1 port=9900
+
+[http]
+# Set to 0.0.0.0 to allow remote access to the web interfaces.
+hostname = 127.0.0.1
+port = 6680
+# "iris" = Mopidy-Iris (the web UI), "mopidy" = the classic Mopidy client
+# index page.  Both are always available: /iris/ and /mopidy/
+default_app = iris
+allowed_origins =
+    http://localhost:6680
+    http://127.0.0.1:6680
+
+[local]
+# Mopidy-Local: an indexed local music library (SQLite), with album, artist
+# and genre browsing.  Build or update the index with:
+#
+#     mopidy local scan
+#
+media_dir = ~/Music
+scan_timeout = 3000
+scan_follow_symlinks = false
+max_search_results = 100
+
+[file]
+# Disabled on purpose: Mopidy-Local indexes the same directory, and the
+# built-in extension would show every file a second time.
+enabled = false
+
+[softwaremixer]
+enabled = true
+
+[qobuz]
+enabled = true
+username =
+password =
+# The token of the Qobuz web player: bin/qobuz-login.sh gets one.
+auth_token =
+app_id =
+secret =
+quality = 27
+# Download queued albums as tagged FLAC files, so they show up in the local
+# library.  The files are stored as
+# <cache_dir>/<artist>/<album>/<track number> - <track title>.flac
+cache_enabled = true
+cache_dir = ~/Music
+search_album_count = 10
+search_track_count = 10
+search_artist_count = 0
+custom_libraries =

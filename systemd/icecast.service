@@ -1,0 +1,14 @@
+[Unit]
+Description=Icecast streaming server (Mopidy stack)
+Documentation=https://icecast.org/docs/
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/opencode/mopidy-stack/icecast/bin/icecast -c /home/opencode/mopidy-stack/config/icecast.xml
+Restart=on-failure
+RestartSec=5
+WorkingDirectory=/home/opencode/mopidy-stack
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,34 @@
+# Icecast mime types.
+#
+# This is a copy of the system mime types with .ogg mapped to
+# application/ogg instead of audio/ogg.
+#
+# The publisher announces the Ogg stream as application/ogg, and Icecast
+# only hands a mount over to its fallback stream when the content types
+# match.  Without this, the listeners would stay on the fallback instead
+# of getting the live stream.
+#
+# Regenerate it after a system update with:
+#
+#     cp /etc/mime.types config/mime.types
+#     sed -i 's|^audio/ogg\(.*\)$|application/ogg\1|' config/mime.types
+#
+audio/mpeg					mp3 mpga mp1 mp2
+audio/mp4					m4a
+application/ogg					oga ogg opus spx
+audio/ogg					oga
+audio/x-flac					flac
+audio/flac					flac
+audio/x-wav					wav
+audio/wav					wav
+text/html					html htm
+text/css					css
+text/plain					txt asc
+application/javascript			js
+application/json				json
+image/png					png
+image/jpeg					jpg jpeg jpe
+image/gif					gif
+image/svg+xml				svg svgz
+application/xml				xml xsl
+text/xml					xml xsl

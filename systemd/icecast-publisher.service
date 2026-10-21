@@ -1,0 +1,16 @@
+[Unit]
+Description=Icecast publisher (continuous Mopidy audio stream)
+Documentation=file:///home/opencode/mopidy-stack/README.md
+After=network.target icecast.service
+Wants=icecast.service
+After=mopidy.service
+
+[Service]
+Type=simple
+ExecStart=/home/opencode/mopidy-stack/venv3/bin/python /home/opencode/mopidy-stack/bin/icecast-publisher.py --password mopidy-stream --admin-password admin --output /high.ogg:flac --output /low.mp3:mp3:128
+Restart=always
+RestartSec=5
+WorkingDirectory=/home/opencode/mopidy-stack
+
+[Install]
+WantedBy=default.target

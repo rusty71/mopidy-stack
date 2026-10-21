@@ -1,0 +1,17 @@
+[Unit]
+Description=Mopidy music server (Mopidy stack)
+Documentation=https://docs.mopidy.com/
+After=network.target
+Wants=icecast.service
+After=icecast.service
+
+[Service]
+Type=simple
+ExecStart=/home/opencode/mopidy-stack/venv3/bin/mopidy
+Restart=on-failure
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+WorkingDirectory=/home/opencode/mopidy-stack
+
+[Install]
+WantedBy=default.target

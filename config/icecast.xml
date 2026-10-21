@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Icecast configuration for the Mopidy stack.
+
+  Mounts:
+    /low.mp3   - MP3, 128 kbps, 44.1 kHz stereo (low bandwidth / mobile)
+    /high.ogg  - Ogg FLAC, lossless up to 24-bit/96 kHz (high resolution)
+
+  The "source" user (source-password below) is what Mopidy authenticates as
+  when it publishes to the mounts.  Listeners are public.
+-->
+<icecast>
+    <location>Home</location>
+    <admin>admin@localhost</admin>
+    <hostname>localhost</hostname>
+
+    <!-- Listen on localhost only.  Change bind-address to 0.0.0.0 to allow
+         remote listeners. -->
+    <listen-socket>
+        <port>8000</port>
+        <bind-address>127.0.0.1</bind-address>
+    </listen-socket>
+
+    <http-headers>
+        <header name="Access-Control-Allow-Origin" value="*" />
+    </http-headers>
+
+    <limits>
+        <clients>20</clients>
+        <sources>10</sources>
+        <!-- Keep the mount buffer big enough for the lossless stream
+             (~400 kB/s), otherwise Icecast drops listeners that fall a
+             little behind. -->
+        <queue-size>524288</queue-size>
+        <client-timeout>30</client-timeout>
+        <header-timeout>15</header-timeout>
+        <source-timeout>10</source-timeout>
+        <burst-on-connect>1</burst-on-connect>
+        <burst-size>32768</burst-size>
+    </limits>
+
+    <authentication>
+        <!-- Sources (Mopidy) log in with username 'source'. -->
+        <source-password>mopidy-stream</source-password>
+        <relay-password>relay-pass</relay-password>
+        <!-- Admin panel: http://localhost:8000/ -->
+        <admin-user>admin</admin-user>
+        <admin-password>admin</admin-password>
+    </authentication>
+
+    <fileserve>1</fileserve>
+
+    <!--
+        Icecast's own mime type table maps .ogg to "audio/ogg", but the
+        Shoutcast client publishes the Ogg stream as "application/ogg".
+        Icecast only hands a mount over to a fallback stream when the
+        content types match, so without this the listeners would get stuck
+        on the fallback instead of the live stream.
+    -->
+    <mime-types>/home/opencode/mopidy-stack/config/mime.types</mime-types>
+
+    <paths>
+        <logdir>/home/opencode/mopidy-stack/log</logdir>
+        <webroot>/home/opencode/mopidy-stack/icecast/share/icecast/web</webroot>
+        <adminroot>/home/opencode/mopidy-stack/icecast/share/icecast/admin</adminroot>
+        <pidfile>/home/opencode/mopidy-stack/run/icecast.pid</pidfile>
+        <alias source="/" destination="/status.xsl"/>
+    </paths>
+
+    <logging>
+        <accesslog>icecast-access.log</accesslog>
+        <errorlog>icecast-error.log</errorlog>
+        <loglevel>3</loglevel>
+        <logsize>100000</logsize>
+    </logging>
+
+    <!-- Low resolution stream: 128 kbps MP3. -->
+    <mount type="normal">
+        <mount-name>/low.mp3</mount-name>
+        <public>1</public>
+        <charset>UTF-8</charset>
+        <!-- Keep the mount alive (and silent) when Mopidy is not playing. -->
+        <fallback-mount>/silence.mp3</fallback-mount>
+        <fallback-override>1</fallback-override>
+    </mount>
+
+    <!-- High resolution stream: lossless Ogg FLAC (up to 24-bit/96 kHz). -->
+    <mount type="normal">
+        <mount-name>/high.ogg</mount-name>
+        <public>1</public>
+        <charset>UTF-8</charset>
+        <!-- Fallback must have the same container type as the live stream. -->
+        <fallback-mount>/silence.ogg</fallback-mount>
+        <fallback-override>1</fallback-override>
+    </mount>
+
+</icecast>

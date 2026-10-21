@@ -1,0 +1,14 @@
+# The real configuration holds the Qobuz credentials
+config/mopidy.conf
+config/mime.types.full
+
+# Local build artefacts
+venv*/
+src/
+data/
+log/
+run/
+web/*.mp3
+web/*.ogg
+__pycache__/
+*.pyc
