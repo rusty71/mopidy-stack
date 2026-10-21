@@ -70,10 +70,11 @@ the two YunoHost packages of this repository:
 
 | | |
 |---|---|
-| Icecast | `music.piksies.nl` (the domain of the app, path `/`; the landing page there links to the two streams) |
+| Icecast | `music.piksies.nl` (the domain of the app, path `/`; it sends the visitor to the player on the port) |
 | Mopidy + Iris | `piksies.nl/mopidy/` (the interface is at `piksies.nl/mopidy/iris/`, and the first visit asks for a name for the browser) |
 | Stream (MP3) | `http://music.piksies.nl:8000/low.mp3` |
 | Stream (FLAC) | `http://music.piksies.nl:8000/high.ogg` |
+| Player | `http://music.piksies.nl:8000/` (a small page with a player and the two links) |
 | Stream, over https | `https://music.piksies.nl/low.mp3` and `https://music.piksies.nl/high.ogg` (through the reverse proxy of YunoHost) |
 
 ```bash
