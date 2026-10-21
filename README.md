@@ -63,6 +63,36 @@ streams on `https://music.example.org/icecast/low.mp3` and
 The [administration guide of the Mopidy package](https://github.com/rusty71/mopidy_ynh/blob/main/doc/ADMIN.md)
 has the details.
 
+## The installation on piksies.nl
+
+The same stack runs on the YunoHost server of the same name, installed with
+the two YunoHost packages of this repository:
+
+| | |
+|---|---|
+| Icecast | `music.piksies.nl` (the domain of the app, path `/`) |
+| Mopidy + Iris | `piksies.nl/mopidy/` (the interface is at `piksies.nl/mopidy/iris/`) |
+| Stream (MP3) | `https://music.piksies.nl/low.mp3` |
+| Stream (FLAC) | `https://music.piksies.nl/high.ogg` |
+| Stream, direct | `http://music.piksies.nl:8000/low.mp3` (the port 8080 of the router is forwarded to it) |
+
+```bash
+# on the server
+sudo yunohost app install https://github.com/rusty71/icecast2_ynh \
+    -a 'domain=music.piksies.nl&path=/&init_main_permission=visitors&admin=jeroen&password=...&expose_port=true' -f
+sudo yunohost app install https://github.com/rusty71/mopidy_ynh \
+    -a 'domain=piksies.nl&path=/mopidy&init_main_permission=visitors&qobuz_auth_token=...&icecast_password=...' -f
+```
+
+The password of the Icecast app is used for the source *and* for the admin
+panel, and the Mopidy app has to use the same one.  The Qobuz auth token is
+the token of the Qobuz web player; see
+[the admin guide of the Mopidy package](https://github.com/rusty71/mopidy_ynh/blob/main/doc/ADMIN.md)
+for how to get it.
+
+The components live in `/var/www/mopidy/src/` as editable git checkouts, so
+the code can be changed on the server and the services restarted.
+
 ## The local setup
 
 ```
