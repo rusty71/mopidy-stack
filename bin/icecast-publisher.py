@@ -31,6 +31,7 @@ import base64
 import errno
 import logging
 import socket
+import ssl
 import sys
 import threading
 import time
@@ -78,7 +79,7 @@ class IcecastSource:
     """A source client connection to Icecast that stays open."""
 
     def __init__(self, host, port, mount, user, password, content_type, name,
-                 ogg=False):
+                 ogg=False, tls=False):
         self.host = host
         self.port = port
         self.mount = mount
@@ -97,9 +98,20 @@ class IcecastSource:
         self.ogg = ogg
         self.header = b""
         self.capturing_header = ogg
+        self.tls = tls
 
     def connect(self):
         sock = socket.create_connection((self.host, self.port), timeout=15)
+
+        if self.tls:
+            # The certificate of the server is for the name of the domain,
+            # but the connection goes to the address of the server, so the
+            # name cannot be checked here.
+            context = ssl.create_default_context()
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+            sock = context.wrap_socket(sock, server_hostname=self.host)
+
         auth = base64.b64encode(f"{self.user}:{self.password}".encode()).decode()
         request = (
             f"SOURCE {self.mount} HTTP/1.0\r\n"
@@ -174,9 +186,8 @@ class IcecastSource:
                 "charset": "UTF-8",
             }
         )
-        url = (
-            f"http://{self.host}:{self.port}/admin/metadata?{query}"
-        )
+        scheme = "https" if self.tls else "http"
+        url = f"{scheme}://{self.host}:{self.port}/admin/metadata?{query}"
         credentials = base64.b64encode(
             f"{admin_user}:{admin_password}".encode()
         ).decode()
@@ -184,8 +195,17 @@ class IcecastSource:
             url, headers={"Authorization": f"Basic {credentials}"}
         )
         try:
-            with urllib.request.urlopen(request, timeout=10):
-                pass
+            if self.tls:
+                # The certificate is for the name of the domain, not for the
+                # address the request goes to.
+                context = ssl.create_default_context()
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_NONE
+                with urllib.request.urlopen(request, timeout=10, context=context):
+                    pass
+            else:
+                with urllib.request.urlopen(request, timeout=10):
+                    pass
         except Exception as error:
             logger.debug("Could not set the metadata: %s", error)
 
@@ -343,6 +363,9 @@ class PcmServer:
         self.port = port
         self.buffer = bytearray()
         self.lock = threading.Lock()
+        # Signalled whenever new PCM data arrives or the connection drops, so
+        # the pacing loop can sleep instead of busy-polling.
+        self.cond = threading.Condition()
         self.connected = False
 
     def serve(self):
@@ -384,12 +407,16 @@ class PcmServer:
                     break
                 with self.lock:
                     self.buffer += data
+                with self.cond:
+                    self.cond.notify_all()
         except OSError:
             pass
         finally:
             logger.info("Mopidy disconnected")
             with self.lock:
                 self.connected = False
+            with self.cond:
+                self.cond.notify_all()
             try:
                 conn.close()
             except OSError:
@@ -516,6 +543,11 @@ def main():
     parser.add_argument("--password", default="hackme")
     parser.add_argument("--name", default="Mopidy")
     parser.add_argument(
+        "--tls",
+        action="store_true",
+        help="the Icecast server speaks https on its port",
+    )
+    parser.add_argument(
         "--admin-user",
         default="admin",
         help="Icecast admin user, used to publish the track title",
@@ -562,6 +594,7 @@ def main():
             CONTENT_TYPES[target["codec"]],
             args.name,
             ogg=(target["codec"] == "flac"),
+            tls=args.tls,
         )
         while True:
             try:
@@ -591,51 +624,65 @@ def main():
 
     # The publisher is the clock: it hands the samples to the encoder in real
     # time and fills the gaps with silence, so the stream never stutters.
+    #
+    # Instead of busy-polling every 5 ms, the main thread sleeps on a
+    # condition variable until the next push deadline arrives.  The deadline
+    # advances by exactly one chunk duration after each push, so the push rate
+    # is exactly real-time (one 1024-frame chunk every ~10.7 ms at 96 kHz).
+    # PcmServer notifies the condition whenever new PCM data arrives, so the
+    # loop also wakes early if Mopidy sends data while we are sleeping.
     frame_bytes = publisher.bytes_per_frame
-    silence = b"\x00" * (frame_bytes * 1024)
+    chunk_frames = 1024
+    silence = b"\x00" * (frame_bytes * chunk_frames)
     started = time.monotonic()
     pushed_frames = 0
     pts = 0
+
+    # First push is due after one chunk duration; subsequent deadlines advance
+    # by one chunk duration each, keeping the push rate exactly real-time.
+    next_push = started + chunk_frames / args.rate
 
     try:
         last_report = time.monotonic()
         last_written = 0
         while True:
-            target = int((time.monotonic() - started) * args.rate)
-            behind = target - pushed_frames
-            if behind > 0:
-                want = min(behind, 1024) * frame_bytes
-                data = server.take(want)
-                if len(data) < want:
-                    # Not enough PCM: pad with silence so the timeline keeps
-                    # up with the wall clock.
-                    data += silence[: want - len(data)]
-                frames = len(data) // frame_bytes
-                publisher.push(data, pts)
-                pts += frames * Gst.SECOND // args.rate
-                pushed_frames += frames
+            now = time.monotonic()
+            if now >= next_push:
+                target = int((now - started) * args.rate)
+                behind = target - pushed_frames
+                if behind >= chunk_frames:
+                    want = chunk_frames * frame_bytes
+                    data = server.take(want)
+                    if len(data) < want:
+                        # Not enough PCM: pad with silence so the timeline
+                        # keeps up with the wall clock.
+                        data += silence[: want - len(data)]
+                    frames = chunk_frames
+                    publisher.push(data, pts)
+                    pts += frames * Gst.SECOND // args.rate
+                    pushed_frames += frames
+                # Advance the deadline by one chunk duration, keeping the push
+                # rate exactly real-time regardless of how long the push took.
+                next_push += chunk_frames / args.rate
 
-                # Give the encoder time to catch up.  It writes the data to
-                # Icecast from its own thread, and that thread needs the GIL
-                # - which the main thread holds while it is in here.  Without
-                # this pause the main thread spins at 100% CPU, starves the
-                # encoder, and the stream falls behind (PyGObject 3.42, which
-                # is what Debian 12 ships, keeps the GIL while push-buffer
-                # waits).  Pausing for half the time the audio represents
-                # keeps the timing and lets the encoder keep up.
-                time.sleep(frames / args.rate / 2)
-            else:
-                time.sleep(0.005)
+            # Sleep until the next push deadline, or until new PCM data
+            # arrives (PcmServer notifies the condition on recv).
+            timeout = next_push - time.monotonic()
+            if timeout > 0:
+                with server.cond:
+                    server.cond.wait(timeout)
 
             now = time.monotonic()
             if now - last_report >= 5:
                 last_report = now
+                target_now = int((now - started) * args.rate)
+                behind_now = target_now - pushed_frames
                 out_bytes = sum(t["source"].written for t in targets)
                 logger.info(
                     "pushed %.1fs of audio, %.1fs behind, %d buffers rejected, "
                     "%d bytes of PCM waiting, %.0f kB/s to Icecast",
                     pushed_frames / args.rate,
-                    -behind / args.rate,
+                    -behind_now / args.rate,
                     publisher.rejected,
                     server.pending(),
                     (out_bytes - last_written) / 5 / 1000,
