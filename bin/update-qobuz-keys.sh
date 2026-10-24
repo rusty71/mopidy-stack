@@ -6,11 +6,8 @@
 # "Invalid app secret", run this script and restart Mopidy.
 #
 # The web player bundle contains several app_id/secret pairs, and every
-# app_id only works with its own secret:
-#
-#   798273057 (production)  -> abb21364945c0583309667d13ca3d93a
-#   377257687 (integration) -> 806331c3b0b641da923b890aed01d04a
-#   724307056 (recette)     -> f69a7734686cb9427629378a4b7ac381
+# app_id only works with its own secret.  The script reads them from the
+# bundle; they are not stored in this repository.
 #
 # By default the production pair is used.  Pick another one with:
 #
@@ -67,11 +64,6 @@ session.headers.update(
 from qobuz_dl.bundle import Bundle
 
 candidates = list(Bundle().get_secrets().values())
-# Also try the secrets that ship as plain appSecret pairs in the bundle.
-candidates += [
-    "f686f063cb0841079d48495d4dea7cf2",
-    "05a4851e74ee47fda346f50cfdfc4f09",
-]
 
 for secret in candidates:
     unix = time.time()

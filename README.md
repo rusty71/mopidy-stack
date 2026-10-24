@@ -344,13 +344,8 @@ to 96 kHz, `27` = 24-bit FLAC up to 192 kHz.
 #### app_id / secret
 
 Qobuz's web player bundle contains several app IDs, and each one only works
-with its own secret:
-
-| app_id         | environment | secret                            |
-|----------------|-------------|-----------------------------------|
-| `798273057`    | production  | `abb21364945c0583309667d13ca3d93a` |
-| `377257687`    | integration | `806331c3b0b641da923b890aed01d04a` |
-| `724307056`    | recette     | `f69a7734686cb9427629378a4b7ac381` |
+with its own secret.  `bin/update-qobuz-keys.sh` reads them from the bundle;
+they are not stored in this repository.
 
 The auth token is bound to the app ID as well: a token issued for one app ID
 is rejected by the other.
